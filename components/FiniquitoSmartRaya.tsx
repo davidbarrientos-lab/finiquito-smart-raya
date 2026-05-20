@@ -77,9 +77,6 @@ function parseDate(value: unknown): Date | null {
   let m: number;
   let y: number;
 
-  // Soporta formatos:
-  // 01-09-2020 / 01/09/2020 = día-mes-año, típico Nubox Chile
-  // 2020-09-01 = año-mes-día, formato ISO
   if (String(parts[0]).length === 4) {
     y = first;
     m = second;
@@ -147,14 +144,6 @@ function detectDelimiter(text: string): string {
   return ",";
 }
 
-function normalizeHeader(value: string): string {
-  return value
-    .replace(/^\uFEFF/, "")
-    .replace(/^"|"$/g, "")
-    .trim()
-    .toUpperCase();
-}
-
 function parseCSV(text: string, empresa: string): Worker[] {
   const cleanText = text.replace(/^\uFEFF/, "");
   const delimiter = detectDelimiter(cleanText);
@@ -165,11 +154,6 @@ function parseCSV(text: string, empresa: string): Worker[] {
 
   if (lines.length < 2) return [];
 
-  // Nubox agrega filas iniciales como:
-  // PUBLICIDAD Y PROMOCIONES RAYA S.A.
-  // FECHA: ...
-  // LISTADO DE TRABAJADORES
-  // Por eso buscamos la fila real de encabezados.
   const headerIndex = lines.findIndex((line) => {
     const normalized = line.toUpperCase();
     return (
@@ -185,45 +169,54 @@ function parseCSV(text: string, empresa: string): Worker[] {
     return [];
   }
 
-  const headers = splitCSVLine(lines[headerIndex], delimiter)
-    .map((h) => h.replace(/^"|"$/g, "").trim());
+  const headers = splitCSVLine(lines[headerIndex], delimiter).map((h) =>
+    h.replace(/^"|"$/g, "").trim()
+  );
 
-  return lines.slice(headerIndex + 1).map((line, index) => {
-    const cells = splitCSVLine(line, delimiter).map((c) =>
-      c.replace(/^"|"$/g, "").trim()
-    );
+  return lines
+    .slice(headerIndex + 1)
+    .map((line, index) => {
+      const cells = splitCSVLine(line, delimiter).map((c) =>
+        c.replace(/^"|"$/g, "").trim()
+      );
 
-    const row: Record<string, string> = {};
-    headers.forEach((h, i) => {
-      row[h] = cells[i] ?? "";
-    });
+      const row: Record<string, string> = {};
+      headers.forEach((h, i) => {
+        row[h] = cells[i] ?? "";
+      });
 
-    const codigo = row["CODIGO"] || "";
-    const rut = row["RUT"] || row["Rut_Funcionario"] || row["RUT FUNCIONARIO"] || "Sin RUT";
-    const nombre = [
-      row["NOMBRE"],
-      row["A. PATERNO"],
-      row["A. MATERNO"],
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim();
+      const codigo = row["CODIGO"] || "";
+      const rut =
+        row["RUT"] ||
+        row["Rut_Funcionario"] ||
+        row["RUT FUNCIONARIO"] ||
+        "Sin RUT";
 
-    return {
-      id: `${empresa}-${rut}-${codigo || index}`,
-      empresa,
-      rut,
-      nombre: nombre || "Sin nombre",
-      cargo: row["CARGO"] || "No informado",
-      departamento: row["DESC. DEPARTAMENTO"] || row["DEPARTAMENTO"] || "Sin depto.",
-      fechaIngreso: parseDate(row["FECHA INGRESO"] || row["Fec_Ingreso"]),
-      fechaTerminoNubox: parseDate(row["FECHA TERMINO"] || row["Fec_Termino"]),
-      tipoContrato: row["TIPO DE CONTRATO"] || row["Tipo_Contrato"] || "",
-      sueldoBase: parseCLNumber(row["VALOR SUELDO BASE"] || row["Sueldo_Mes"] || row["SUELDO BASE"]),
-      raw: row,
-    };
-  }).filter((w) => w.rut !== "Sin RUT" && w.nombre !== "Sin nombre");
+      const nombre = [
+        row["NOMBRE"] || row["Nombres"],
+        row["A. PATERNO"] || row["Ape_Paterno"],
+        row["A. MATERNO"] || row["Ape_Materno"],
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      return {
+        id: `${empresa}-${rut}-${codigo || index}`,
+        empresa,
+        rut,
+        nombre: nombre || "Sin nombre",
+        cargo: row["CARGO"] || "No informado",
+        departamento: row["DESC. DEPARTAMENTO"] || row["DEPARTAMENTO"] || row["Departamento"] || "Sin depto.",
+        fechaIngreso: parseDate(row["FECHA INGRESO"] || row["Fec_Ingreso"]),
+        fechaTerminoNubox: parseDate(row["FECHA TERMINO"] || row["Fec_Termino"]),
+        tipoContrato: row["TIPO DE CONTRATO"] || row["Tipo_Contrato"] || "",
+        sueldoBase: parseCLNumber(row["VALOR SUELDO BASE"] || row["Sueldo_Mes"] || row["SUELDO BASE"]),
+        raw: row,
+      };
+    })
+    .filter((w) => w.rut !== "Sin RUT" && w.nombre !== "Sin nombre");
 }
 
 function yearsBetween(start: Date | null, end: Date | null): number {
@@ -269,9 +262,7 @@ function calcFiniquito(worker: Worker, input: SimInput, params: Params) {
   const avisoPrevio = input.aplicaAviso ? baseTopeada : 0;
 
   const causalConIAS = ["art161", "mutuo_con_ias"].includes(input.causal);
-  const aniosIndemnizables = causalConIAS
-    ? Math.min(antiguedadAnios, 11)
-    : 0;
+  const aniosIndemnizables = causalConIAS ? Math.min(antiguedadAnios, 11) : 0;
 
   const ias = baseTopeada * aniosIndemnizables;
   const diasTrabajados = parseCLNumber(input.diasTrabajadosMonto);
@@ -312,7 +303,6 @@ function calcFiniquito(worker: Worker, input: SimInput, params: Params) {
 const sampleCSV = `Codigo;Rut_Funcionario;DV_Rut_Funcionario;Nombres;Ape_Paterno;Ape_Materno;Fec_Ingreso;Fec_Termino;Tipo_Contrato;Departamento;Sueldo_Mes
 1;11111111;1;JUAN ALBERTO;PEREZ;PEREZ;01/11/2014;;2;Administracion;950000
 2;12345678;5;JOSE ANTONIO;GONZALEZ;GUZMAN;01/04/2015;;2;Finanzas;1250000`;
-
 
 function toISODate(date: Date | null): string | null {
   if (!date) return null;
@@ -394,9 +384,9 @@ export default function FiniquitoSmartRaya() {
       }
 
       const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
+        .from("perfiles")
         .select("*")
-        .eq("id", user.id)
+        .eq("identificación", user.id)
         .eq("is_active", true)
         .single();
 
@@ -561,7 +551,6 @@ export default function FiniquitoSmartRaya() {
     URL.revokeObjectURL(url);
   }
 
-
   async function handleLogout() {
     await supabase.auth.signOut();
     window.location.href = "/login";
@@ -572,7 +561,9 @@ export default function FiniquitoSmartRaya() {
       <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
         <div className="rounded-3xl border border-slate-800 bg-slate-900 p-8 text-center shadow-2xl">
           <h1 className="text-2xl font-bold">Validando acceso...</h1>
-          <p className="mt-2 text-slate-400">Conectando con Supabase y revisando permisos.</p>
+          <p className="mt-2 text-slate-400">
+            Conectando con Supabase y revisando permisos.
+          </p>
         </div>
       </main>
     );
@@ -593,15 +584,13 @@ export default function FiniquitoSmartRaya() {
               Carga el maestro Nubox, selecciona empresa y trabajadores, simula
               finiquitos individuales o masivos y estima la caja requerida.
             </p>
-            <p className="mt-2 text-sm text-emerald-300">
-              {syncStatus}
-            </p>
+            <p className="mt-2 text-sm text-emerald-300">{syncStatus}</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {profile && (
               <div className="rounded-2xl border border-slate-700 px-4 py-2 text-sm text-slate-300">
-                {profile.email} · {profile.role}
+                {profile["correo_electrónico"] || profile.email || "Usuario"} · {profile.role || "sin rol"}
               </div>
             )}
 
@@ -752,10 +741,7 @@ export default function FiniquitoSmartRaya() {
                 </thead>
                 <tbody>
                   {filtered.map((w) => (
-                    <tr
-                      key={w.id}
-                      className="border-t border-slate-800 hover:bg-slate-800/50"
-                    >
+                    <tr key={w.id} className="border-t border-slate-800 hover:bg-slate-800/50">
                       <td className="p-3">
                         <input
                           type="checkbox"
@@ -769,18 +755,13 @@ export default function FiniquitoSmartRaya() {
                       </td>
                       <td className="p-3">{w.empresa}</td>
                       <td className="p-3">{formatDate(w.fechaIngreso)}</td>
-                      <td className="p-3 text-right">
-                        {CLP.format(w.sueldoBase)}
-                      </td>
+                      <td className="p-3 text-right">{CLP.format(w.sueldoBase)}</td>
                     </tr>
                   ))}
 
                   {!filtered.length && (
                     <tr>
-                      <td
-                        colSpan={5}
-                        className="p-8 text-center text-slate-500"
-                      >
+                      <td colSpan={5} className="p-8 text-center text-slate-500">
                         Carga un CSV Nubox o usa el ejemplo.
                       </td>
                     </tr>
@@ -857,9 +838,7 @@ export default function FiniquitoSmartRaya() {
               <input
                 placeholder="Monto AFC"
                 value={input.afcMonto}
-                onChange={(e) =>
-                  setInput({ ...input, afcMonto: e.target.value })
-                }
+                onChange={(e) => setInput({ ...input, afcMonto: e.target.value })}
                 className="rounded-2xl border border-slate-700 bg-slate-950 p-2"
               />
             )}
@@ -901,12 +880,8 @@ export default function FiniquitoSmartRaya() {
                       </div>
                     </td>
                     <td className="p-3 text-right">{CLP.format(calc.base)}</td>
-                    <td className="p-3 text-right">
-                      {CLP.format(calc.vacaciones)}
-                    </td>
-                    <td className="p-3 text-right">
-                      {CLP.format(calc.avisoPrevio)}
-                    </td>
+                    <td className="p-3 text-right">{CLP.format(calc.vacaciones)}</td>
+                    <td className="p-3 text-right">{CLP.format(calc.avisoPrevio)}</td>
                     <td className="p-3 text-right">{CLP.format(calc.ias)}</td>
                     <td className="p-3 text-right font-bold text-cyan-200">
                       {CLP.format(calc.total)}
