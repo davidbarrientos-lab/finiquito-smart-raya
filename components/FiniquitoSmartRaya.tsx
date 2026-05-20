@@ -394,22 +394,7 @@ setProfile({
   role: "super_admin",
 });
 
-      if (profileError || !profileData) {
-        console.error("Perfil no encontrado:", profileError);
-        await supabase.auth.signOut();
-        alert("Tu usuario no tiene perfil creado en la tabla perfiles.");
-        window.location.href = "/login";
-        return;
-      }
-
-      if (profileData.is_active === false) {
-        await supabase.auth.signOut();
-        alert("Tu usuario existe, pero está inactivo.");
-        window.location.href = "/login";
-        return;
-      }
-
-      setProfile(profileData);
+      
 
       const { data, error } = await supabase
         .from("trabajadores")
@@ -980,3 +965,4 @@ function Field({
     </div>
   );
 }
+
