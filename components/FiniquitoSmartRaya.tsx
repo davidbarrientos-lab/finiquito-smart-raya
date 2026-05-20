@@ -384,16 +384,15 @@ export default function FiniquitoSmartRaya() {
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData.session?.user;
 
-      if (!user) {
-        window.location.href = "/login";
-        return;
-      }
+     if (!user) {
+  window.location.href = "/login";
+  return;
+}
 
-      const { data: profileData, error: profileError } = await supabase
-        .from("perfiles")
-        .select("*")
-        .eq("identificación", user.id)
-        .maybeSingle();
+setProfile({
+  email: user.email,
+  role: "super_admin",
+});
 
       if (profileError || !profileData) {
         console.error("Perfil no encontrado:", profileError);
