@@ -208,11 +208,17 @@ function parseCSV(text: string, empresa: string): Worker[] {
         rut,
         nombre: nombre || "Sin nombre",
         cargo: row["CARGO"] || "No informado",
-        departamento: row["DESC. DEPARTAMENTO"] || row["DEPARTAMENTO"] || row["Departamento"] || "Sin depto.",
+        departamento:
+          row["DESC. DEPARTAMENTO"] ||
+          row["DEPARTAMENTO"] ||
+          row["Departamento"] ||
+          "Sin depto.",
         fechaIngreso: parseDate(row["FECHA INGRESO"] || row["Fec_Ingreso"]),
         fechaTerminoNubox: parseDate(row["FECHA TERMINO"] || row["Fec_Termino"]),
         tipoContrato: row["TIPO DE CONTRATO"] || row["Tipo_Contrato"] || "",
-        sueldoBase: parseCLNumber(row["VALOR SUELDO BASE"] || row["Sueldo_Mes"] || row["SUELDO BASE"]),
+        sueldoBase: parseCLNumber(
+          row["VALOR SUELDO BASE"] || row["Sueldo_Mes"] || row["SUELDO BASE"]
+        ),
         raw: row,
       };
     })
@@ -387,13 +393,19 @@ export default function FiniquitoSmartRaya() {
         .from("perfiles")
         .select("*")
         .eq("identificación", user.id)
-        .eq("is_active", true)
-        .single();
+        .maybeSingle();
 
       if (profileError || !profileData) {
-        console.error("Perfil no autorizado:", profileError);
+        console.error("Perfil no encontrado:", profileError);
         await supabase.auth.signOut();
-        alert("Tu usuario no tiene perfil activo. Contacta al super admin.");
+        alert("Tu usuario no tiene perfil creado en la tabla perfiles.");
+        window.location.href = "/login";
+        return;
+      }
+
+      if (profileData.is_active === false) {
+        await supabase.auth.signOut();
+        alert("Tu usuario existe, pero está inactivo.");
         window.location.href = "/login";
         return;
       }
@@ -590,7 +602,8 @@ export default function FiniquitoSmartRaya() {
           <div className="flex flex-wrap gap-2">
             {profile && (
               <div className="rounded-2xl border border-slate-700 px-4 py-2 text-sm text-slate-300">
-                {profile["correo_electrónico"] || profile.email || "Usuario"} · {profile.role || "sin rol"}
+                {profile["correo_electrónico"] || profile.email || "Usuario"} ·{" "}
+                {profile.role || "sin rol"}
               </div>
             )}
 
@@ -741,7 +754,10 @@ export default function FiniquitoSmartRaya() {
                 </thead>
                 <tbody>
                   {filtered.map((w) => (
-                    <tr key={w.id} className="border-t border-slate-800 hover:bg-slate-800/50">
+                    <tr
+                      key={w.id}
+                      className="border-t border-slate-800 hover:bg-slate-800/50"
+                    >
                       <td className="p-3">
                         <input
                           type="checkbox"
@@ -755,7 +771,9 @@ export default function FiniquitoSmartRaya() {
                       </td>
                       <td className="p-3">{w.empresa}</td>
                       <td className="p-3">{formatDate(w.fechaIngreso)}</td>
-                      <td className="p-3 text-right">{CLP.format(w.sueldoBase)}</td>
+                      <td className="p-3 text-right">
+                        {CLP.format(w.sueldoBase)}
+                      </td>
                     </tr>
                   ))}
 
@@ -793,7 +811,9 @@ export default function FiniquitoSmartRaya() {
                 <option value="art161">Art. 161 / necesidades empresa</option>
                 <option value="renuncia">Renuncia</option>
                 <option value="mutuo">Mutuo acuerdo sin IAS</option>
-                <option value="mutuo_con_ias">Mutuo acuerdo con IAS pactada</option>
+                <option value="mutuo_con_ias">
+                  Mutuo acuerdo con IAS pactada
+                </option>
                 <option value="vencimiento">Vencimiento plazo</option>
               </select>
             </div>
@@ -838,7 +858,9 @@ export default function FiniquitoSmartRaya() {
               <input
                 placeholder="Monto AFC"
                 value={input.afcMonto}
-                onChange={(e) => setInput({ ...input, afcMonto: e.target.value })}
+                onChange={(e) =>
+                  setInput({ ...input, afcMonto: e.target.value })
+                }
                 className="rounded-2xl border border-slate-700 bg-slate-950 p-2"
               />
             )}
@@ -875,13 +897,17 @@ export default function FiniquitoSmartRaya() {
                     <td className="p-3">
                       <div className="font-medium">{worker.nombre}</div>
                       <div className="text-slate-500">
-                        {worker.empresa} · {worker.rut} · {calc.antiguedadAnios} años{" "}
-                        {calc.antiguedadMeses} meses
+                        {worker.empresa} · {worker.rut} ·{" "}
+                        {calc.antiguedadAnios} años {calc.antiguedadMeses} meses
                       </div>
                     </td>
                     <td className="p-3 text-right">{CLP.format(calc.base)}</td>
-                    <td className="p-3 text-right">{CLP.format(calc.vacaciones)}</td>
-                    <td className="p-3 text-right">{CLP.format(calc.avisoPrevio)}</td>
+                    <td className="p-3 text-right">
+                      {CLP.format(calc.vacaciones)}
+                    </td>
+                    <td className="p-3 text-right">
+                      {CLP.format(calc.avisoPrevio)}
+                    </td>
                     <td className="p-3 text-right">{CLP.format(calc.ias)}</td>
                     <td className="p-3 text-right font-bold text-cyan-200">
                       {CLP.format(calc.total)}
